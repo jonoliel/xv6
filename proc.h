@@ -1,3 +1,5 @@
+#define NUMSIG 32
+
 // Per-CPU state
 struct cpu {
   uchar apicid;                // Local APIC ID
@@ -49,6 +51,10 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  int pending;			// Binary representation of pending signals according to numbers
+  sighandler_t sighandlers[NUMSIG]; // Array of handler functions for different signals
+  int signal_executing;		// Did the process stop in the middle of executing a signal handler?
+  struct trapframe *tempTf;     // Save trap frame before execution of signal handler, then re-insert it on signal return
 };
 
 // Process memory is laid out contiguously, low addresses first:

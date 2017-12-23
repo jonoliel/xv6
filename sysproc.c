@@ -83,9 +83,42 @@ int
 sys_uptime(void)
 {
   uint xticks;
-
   acquire(&tickslock);
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+
+int
+sys_signal(void)
+{
+  int sig_num;
+  int sighandler = 0;
+
+  if (argint(0, &sig_num) < 0) 
+     return -1;
+  if (argint(1, &sighandler) < 0)
+     return -1;
+
+  return signal(sig_num, (void *)sighandler);
+}
+
+
+int 
+sys_sigsend(void)
+{
+  int destination_pid, signal_value;
+  if (argint(0, &destination_pid) < 0)
+      return -1;
+  if (argint(1, &signal_value) < 0)
+      return -1;
+  return sigsend(destination_pid, signal_value);
+}
+
+int
+sys_sigreturn(void)
+{
+  sigreturn();
+  return 1;
 }

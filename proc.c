@@ -112,7 +112,15 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  p->signal_executing = 0;
+  for (int i=0; i<NUMSIG; i++)  //Jonathan
+  	p->sighandlers[i] = &default_handler(i,p->pid);
   return p;
+}
+
+//Default handler for signal number i
+void default_handler(int signum, int pid) {
+  printf("A signal %d was accepted by process %d", signum, pid);
 }
 
 //PAGEBREAK: 32
@@ -532,3 +540,60 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+
+// A process wishing to register a custom handler for
+// a specific signal will use the following system call
+sighandler_t
+signal(int signum, sighandler_t handler)
+{
+  struct proc *p = myproc();
+  if (*handler == NULL)
+	return -1;
+  if (signum > 31 || signum < 0)
+	return -1;
+
+  sighandler_t old_handler= p->sighandlers[signum];
+  p->sighandlers[signum] = handler;
+  return old_handler;	
+}
+
+// Sending a signal signum to process pid
+int
+sigsend(int pid, int signum)
+{
+  int binary_signum = 1<<(signum-1);
+  struct proc *p;   
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+	p->pending = (p->pending) | binary_signum;
+        return 0;
+    }
+  }
+  return -1;
+}
+
+// Make sure process receiving signal actually executes the handler 
+int
+sigreturn(void)
+{
+
+  p->signal_executing = 0; 
+  return 1;
+}
+
+void 
+check_pending(struct trapframe *tf) 
+{
+  struct proc *p = myproc();
+  if (p->signal_executing)
+    return;  
+  p->signal_executing = 1;
+  memmove(&p->tempTf, proc->tf, sizeof(struct trapframe));  // Save temporary trap frame while handler executes
+
+
+}
+
+
+
+

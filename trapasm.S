@@ -23,6 +23,11 @@ alltraps:
   # Return falls through to trapret...
 .globl trapret
 trapret:
+
+  pushl %esp	     // Jonathan 
+  call check_pending  // Call check_pending(tf), check for pending signals
+  addl $4, %esp
+
   popal
   popl %gs
   popl %fs
