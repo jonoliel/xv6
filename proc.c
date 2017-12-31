@@ -7,6 +7,8 @@
 #include "proc.h"
 #include "spinlock.h"
 
+
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -17,6 +19,7 @@ static struct proc *initproc;
 int nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
+extern void default_handler(int);
 
 static void wakeup1(void *chan);
 
@@ -65,6 +68,7 @@ myproc(void) {
   return p;
 }
 
+
 //PAGEBREAK: 32
 // Look in the process table for an UNUSED proc.
 // If found, change state to EMBRYO and initialize
@@ -75,7 +79,7 @@ allocproc(void)
 {
   struct proc *p;
   char *sp;
-
+  
   acquire(&ptable.lock);
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
@@ -88,7 +92,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -97,10 +101,20 @@ found:
     return 0;
   }
   sp = p->kstack + KSTACKSIZE;
-
+  
   // Leave room for trap frame.
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*)sp;
+
+ // sp -= sizeof *p->tempTf;
+ // p->tempTf = (struct trapframe*)sp;
+
+  //struct trapframe temptf;
+  //p->tempTf = &temptf;
+  p->signal_executing = 0;
+  p->sigreturn_address = (uint)sigret;
+  for (int i=0; i<NUMSIG; i++)  //Jonathan - set up default handlers for each signal 
+    p->sighandlers[i] = (sighandler_t)default_handler;
 
   // Set up new context to start executing at forkret,
   // which returns to trapret.
@@ -111,17 +125,12 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
+  
+  
 
-  p->signal_executing = 0;
-  for (int i=0; i<NUMSIG; i++)  //Jonathan
-  	p->sighandlers[i] = &default_handler(i,p->pid);
   return p;
 }
 
-//Default handler for signal number i
-void default_handler(int signum, int pid) {
-  printf("A signal %d was accepted by process %d", signum, pid);
-}
 
 //PAGEBREAK: 32
 // Set up first user process.
@@ -146,6 +155,7 @@ userinit(void)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
+
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -268,7 +278,6 @@ exit(void)
         wakeup1(initproc);
     }
   }
-
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
   sched();
@@ -347,19 +356,21 @@ scheduler(void)
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
+
+      
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
 
       swtch(&(c->scheduler), p->context);
       switchkvm();
-
+      
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
     }
     release(&ptable.lock);
-
+    
   }
 }
 
@@ -384,6 +395,7 @@ sched(void)
     panic("sched running");
   if(readeflags()&FL_IF)
     panic("sched interruptible");
+
   intena = mycpu()->intena;
   swtch(&p->context, mycpu()->scheduler);
   mycpu()->intena = intena;
@@ -548,11 +560,11 @@ sighandler_t
 signal(int signum, sighandler_t handler)
 {
   struct proc *p = myproc();
-  if (*handler == NULL)
-	return -1;
+  if (*handler == 0)
+	return (sighandler_t)(-1);
   if (signum > 31 || signum < 0)
-	return -1;
-
+	return (sighandler_t)(-1);
+  cprintf("\nSetting signal %d", signum);
   sighandler_t old_handler= p->sighandlers[signum];
   p->sighandlers[signum] = handler;
   return old_handler;	
@@ -562,37 +574,29 @@ signal(int signum, sighandler_t handler)
 int
 sigsend(int pid, int signum)
 {
-  int binary_signum = 1<<(signum-1);
+  int binary_signum = 1<<(signum);
+  cprintf("\nSending signal number %d to process %d\n", signum, pid);
   struct proc *p;   
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
 	p->pending = (p->pending) | binary_signum;
-        return 0;
+	return 0;
     }
   }
-  return -1;
+  return -1;	
 }
 
 // Make sure process receiving signal actually executes the handler 
 int
 sigreturn(void)
 {
-
-  p->signal_executing = 0; 
-  return 1;
-}
-
-void 
-check_pending(struct trapframe *tf) 
-{
   struct proc *p = myproc();
-  if (p->signal_executing)
-    return;  
-  p->signal_executing = 1;
-  memmove(&p->tempTf, proc->tf, sizeof(struct trapframe));  // Save temporary trap frame while handler executes
-
-
+  memmove(p->tf, &p->tempTf, sizeof(struct trapframe));
+  p->signal_executing = 0;	 
+  cprintf("\nReturning from signal\n");
+  return 0;
 }
+
 
 
 

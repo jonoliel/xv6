@@ -1,4 +1,13 @@
 #include "mmu.h"
+#include "syscall.h"
+#include "traps.h"
+
+.globl sigret
+.globl sigret_end
+sigret:
+  movl $SYS_sigreturn, %eax
+  int $T_SYSCALL
+sigret_end:
 
   # vectors.S sends all traps here.
 .globl alltraps
@@ -24,8 +33,8 @@ alltraps:
 .globl trapret
 trapret:
 
-  pushl %esp	     // Jonathan 
-  call check_pending  // Call check_pending(tf), check for pending signals
+  pushl %esp	     //# Jonathan 
+  call check_pending  //# Call check_pending(tf), check for pending signals
   addl $4, %esp
 
   popal

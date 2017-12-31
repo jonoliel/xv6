@@ -110,3 +110,58 @@ trap(struct trapframe *tf)
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();
 }
+
+
+void default_handler(int signum) {
+  struct proc *p = myproc();
+  cprintf("\nA signal %d was accepted by process %d", signum, p->pid);
+}
+
+void 
+check_pending() 
+{
+  struct proc *p = myproc();
+
+  if ( p == 0)		//Check process created
+    return;
+  if (p->signal_executing == 1)		// Check if handler already in middle of execution
+    return;
+  if (p->pending == 0)		// Check if there are pending signals at all
+    return;
+  p->signal_executing = 1; 
+
+  for (int i = 0; i < NUMSIG; i++) {	//Signals are from 0 to 31
+	   if ( (p->pending & (1 << i)) > 0) {
+	      cprintf("\nFound new signal to handle!");
+	      //cprintf("\nPending: %d", p->pending); 
+       	      cprintf("\nThe signal received is %d", i);
+	      
+
+	     if (p->sighandlers[i] == (sighandler_t)default_handler) {	//Check if default handler
+	        default_handler(i);
+	     }
+	     else {
+		  memmove(&p->tempTf, p->tf, sizeof(struct trapframe));  // Save temporary trap frame while handler executes
+
+		  p->tf->esp -= (uint)&sigret_end - (uint)&sigret;	// Save room for sigret assembly code
+		  memmove((void*)p->tf->esp, sigret, (uint)&sigret_end - (uint)&sigret);	// Insert invocation of sigret
+		  *((uint*)(p->tf->esp - 4)) = p->tf->eip;
+		  *((uint*)(p->tf->esp - 8)) = i; // push i as argument signum for signal handler
+		  *((uint*)(p->tf->esp - 12)) = p->tf->esp; // sigreturn system call code address
+		  //*((uint*)(p->tf->esp - 12)) = p->sigreturn_address;
+		  p->tf->esp -= 12;
+		  p->tf->eip = (uint)(p->sighandlers[i]); // trapret will resume into signal handler
+
+		  p->sighandlers[i] = (sighandler_t)default_handler;	// Make handler back to default handler
+	     }
+             p->pending = p->pending  -  ( 1 << i) ;	// Update pending - we took care of the signal
+	  
+	  }
+	  if (p->pending <= 0)		// Check if there are pending signals at all
+    		return;
+	  
+     }
+}
+
+
+

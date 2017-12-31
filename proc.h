@@ -36,6 +36,41 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+struct trapframe2 {
+  // registers as pushed by pusha
+  uint edi;
+  uint esi;
+  uint ebp;
+  uint oesp;      // useless & ignored
+  uint ebx;
+  uint edx;
+  uint ecx;
+  uint eax;
+
+  // rest of trap frame
+  ushort gs;
+  ushort padding1;
+  ushort fs;
+  ushort padding2;
+  ushort es;
+  ushort padding3;
+  ushort ds;
+  ushort padding4;
+  uint trapno;
+
+  // below here defined by x86 hardware
+  uint err;
+  uint eip;
+  ushort cs;
+  ushort padding5;
+  uint eflags;
+
+  // below here only when crossing rings, such as from user to kernel
+  uint esp;
+  ushort ss;
+  ushort padding6;
+};
+
 // Per-process state
 struct proc {
   uint sz;                     // Size of process memory (bytes)
@@ -54,8 +89,10 @@ struct proc {
   int pending;			// Binary representation of pending signals according to numbers
   sighandler_t sighandlers[NUMSIG]; // Array of handler functions for different signals
   int signal_executing;		// Did the process stop in the middle of executing a signal handler?
-  struct trapframe *tempTf;     // Save trap frame before execution of signal handler, then re-insert it on signal return
+  struct trapframe2 tempTf;     // Save trap frame before execution of signal handler, then re-insert it on signal return
+  uint sigreturn_address;	// The address of sigreturn upon returning from signal handler
 };
+
 
 // Process memory is laid out contiguously, low addresses first:
 //   text

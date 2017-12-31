@@ -122,7 +122,7 @@ void            wakeup(void*);
 void            yield(void);
 sighandler_t 	signal(int signum, sighandler_t handler); 	//Jonathan
 int             sigsend(int, int);				//Jonathan
-void 		sigreturn(void);				//Jonathan
+int 		sigreturn(void);				//Jonathan
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -162,6 +162,10 @@ void            syscall(void);
 // timer.c
 void            timerinit(void);
 
+//trapASM.S
+void 		sigret(void);
+void 		sigret_end(void);
+
 // trap.c
 void            idtinit(void);
 extern uint     ticks;
@@ -191,3 +195,4 @@ void            clearpteu(pde_t *pgdir, char *uva);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+

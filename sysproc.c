@@ -101,7 +101,7 @@ sys_signal(void)
   if (argint(1, &sighandler) < 0)
      return -1;
 
-  return signal(sig_num, (void *)sighandler);
+  return (int)signal(sig_num, (void *)sighandler);
 }
 
 
@@ -119,6 +119,5 @@ sys_sigsend(void)
 int
 sys_sigreturn(void)
 {
-  sigreturn();
-  return 1;
+  return sigreturn();
 }
